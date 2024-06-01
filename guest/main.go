@@ -1,4 +1,4 @@
-package main
+package guest
 
 import (
 	"encoding/json"
@@ -16,32 +16,6 @@ type Function struct {
 	Results    []api.ValueType
 	Fn         any `json:"-"`
 	fn         reflect.Value
-}
-
-func main() {
-	SetExports([]*Function{
-		{
-			ModuleName: "try",
-			Name:       "toto",
-			Fn: func(i uint64) uint64 {
-				fmt.Println("TOTO IS CALLED", i)
-				return i * 2
-			},
-			Params:  []api.ValueType{api.ValueTypeI64},
-			Results: []api.ValueType{api.ValueTypeI64},
-		},
-		{
-			ModuleName: "try",
-			Name:       "titi",
-			Fn: func(i uint64, j uint64) uint64 {
-				fmt.Println("TiTi IS CALLED", i)
-				return i + j
-			},
-			Params:  []api.ValueType{api.ValueTypeI64, api.ValueTypeI64},
-			Results: []api.ValueType{api.ValueTypeI64},
-		},
-	},
-	)
 }
 
 func run(exports []*Function) {
