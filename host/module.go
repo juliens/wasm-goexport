@@ -12,7 +12,8 @@ import (
 const HostModule = "go_exporter"
 
 type Exporter struct {
-	runtime wazero.Runtime
+	runtime     wazero.Runtime
+	exportsChan chan []Function
 }
 
 type definition struct {
@@ -95,7 +96,7 @@ func (l *localFunc) Definition() api.FunctionDefinition {
 
 func (l *localFunc) Call(ctx context.Context, params ...uint64) ([]uint64, error) {
 	l.params = params
-	*l.mod.ptrCtx = context.WithValue(ctx, localFn, l)
+	*l.mod.ptrCtx = context.WithValue(ctx, localFn_key, l)
 	l.callbackChan <- l.callbackNum
 	select {
 	case <-l.feedbackChan:
@@ -154,7 +155,8 @@ func (m *Module) ExportedFunctionDefinitions() map[string]api.FunctionDefinition
 
 func NewExporter(runtime wazero.Runtime) *Exporter {
 	return &Exporter{
-		runtime: runtime,
+		runtime:     runtime,
+		exportsChan: make(chan []Function),
 	}
 }
 
@@ -167,15 +169,11 @@ func (e *Exporter) detectGoExports(mod wazero.CompiledModule) bool {
 	return false
 }
 
-func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.CompiledModule, config wazero.ModuleConfig) (api.Module, error) {
-	if !e.detectGoExports(compiled) {
-		return e.runtime.InstantiateModule(ctx, compiled, config)
+func (e *Exporter) BuildHost(ctx context.Context, module wazero.CompiledModule) error {
+	if !e.detectGoExports(module) {
+		return nil
 	}
-
-	exportsChan := make(chan []Function)
-	callbackChan := make(chan uint32)
-	feedbackChan := make(chan struct{})
-	b := e.runtime.NewHostModuleBuilder(HostModule).
+	_, err := e.runtime.NewHostModuleBuilder(HostModule).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			buf := uint32(stack[0])
@@ -186,11 +184,12 @@ func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.Compile
 			if err != nil {
 				panic(err)
 			}
-			exportsChan <- exportedFn
+			e.exportsChan <- exportedFn
 		}), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).Export("set_exports").
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			stack[0] = uint64(<-callbackChan)
+			callback := ctx.Value(callback_key).(chan uint32)
+			stack[0] = uint64(<-callback)
 		}), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).Export("get_callback").
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
@@ -208,17 +207,28 @@ func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.Compile
 		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{}).Export("set_result").
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			feedbackChan <- struct{}{}
-		}), []api.ValueType{}, []api.ValueType{}).Export("wait_feedback")
-	b.Instantiate(context.Background())
+			fn := getLocalFunc(ctx)
+			fn.feedbackChan <- struct{}{}
+		}), []api.ValueType{}, []api.ValueType{}).Export("wait_feedback").Instantiate(ctx)
+	return err
+}
+
+func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.CompiledModule, config wazero.ModuleConfig) (api.Module, error) {
+	if !e.detectGoExports(compiled) {
+		return e.runtime.InstantiateModule(ctx, compiled, config)
+	}
+
+	callbackChan := make(chan uint32)
+	feedbackChan := make(chan struct{})
+
 	var mod api.Module
 	errCh := make(chan error)
 
 	// To create a pointer for context.Context
-	cpCtx := context.WithValue(ctx, ctx_cp, struct{}{})
+	cpCtx := context.WithValue(ctx, ctx_cp_kety, struct{}{})
 	var ptrCtx = &cpCtx
 	ctx = context.WithValue(ctx, ctx_key, ptrCtx)
-
+	ctx = context.WithValue(ctx, callback_key, callbackChan)
 	go func() {
 		var err error
 		mod, err = e.runtime.InstantiateModule(ctx, compiled, config.WithStartFunctions().WithStdout(os.Stdout))
@@ -240,7 +250,7 @@ func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.Compile
 		return nil, err
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case exportedFn := <-exportsChan:
+	case exportedFn := <-e.exportsChan:
 		exported := map[string]*localFunc{}
 		for i, f := range exportedFn {
 			exported[f.Name] = &localFunc{
@@ -251,6 +261,7 @@ func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.Compile
 				mod:          modu,
 				def:          definition{fn: f},
 			}
+
 		}
 		modu.exportedFn = exported
 		modu.Module = mod
@@ -261,8 +272,9 @@ func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.Compile
 type key_type string
 
 var ctx_key = key_type("key")
-var ctx_cp = key_type("cp")
-var localFn = key_type("fn")
+var ctx_cp_kety = key_type("cp")
+var localFn_key = key_type("fn")
+var callback_key = key_type("callback")
 
 func GetRealCtx(ctx context.Context) context.Context {
 	curCtx := ctx.Value(ctx_key)
@@ -275,7 +287,7 @@ func GetRealCtx(ctx context.Context) context.Context {
 
 func getLocalFunc(ctx context.Context) *localFunc {
 	ctx = GetRealCtx(ctx)
-	if fn, ok := ctx.Value(localFn).(*localFunc); ok {
+	if fn, ok := ctx.Value(localFn_key).(*localFunc); ok {
 		return fn
 	}
 	return nil

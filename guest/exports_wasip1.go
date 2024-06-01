@@ -1,3 +1,5 @@
+//go:build wasip1
+
 package guest
 
 import (
@@ -9,19 +11,10 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-type Function struct {
-	ModuleName string `json:"moduleName"`
-	Name       string `json:"name"`
-	Params     []api.ValueType
-	Results    []api.ValueType
-	Fn         any `json:"-"`
-	fn         reflect.Value
-}
-
 func run(exports []*Function) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Recovered in f", r)
+			fmt.Println("Recovered in run", r)
 		}
 	}()
 	for {
@@ -31,8 +24,17 @@ func run(exports []*Function) {
 		}
 		fn := exports[callback]
 		params := []reflect.Value{}
-		for i := range fn.Params {
-			params = append(params, reflect.ValueOf(get_arg(uint64(i))))
+
+		for i, param := range fn.Params {
+			var value reflect.Value
+			switch param {
+			case api.ValueTypeI64:
+				value = reflect.ValueOf(get_arg(uint64(i)))
+			case api.ValueTypeI32:
+				value = reflect.ValueOf(uint32(get_arg(uint64(i))))
+			}
+
+			params = append(params, value)
 		}
 		callResults := fn.fn.Call(params)
 		if len(callResults) > 0 {
@@ -49,12 +51,11 @@ func getCallback() uint32 {
 func SetExports(exports []*Function) {
 	b, err := json.Marshal(exports)
 	if err != nil {
-		panic("TEST")
+		panic(err)
 	}
 	setExports(b)
 	for _, export := range exports {
 		if reflect.TypeOf(export.Fn).Kind() != reflect.Func {
-			fmt.Println("PANIC")
 			panic("not a function")
 		}
 		export.fn = reflect.ValueOf(export.Fn)
