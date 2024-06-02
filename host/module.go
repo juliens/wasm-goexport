@@ -160,7 +160,7 @@ func NewExporter(runtime wazero.Runtime) *Exporter {
 	}
 }
 
-func (e *Exporter) detectGoExports(mod wazero.CompiledModule) bool {
+func (e *Exporter) DetectGoExports(mod wazero.CompiledModule) bool {
 	for _, f := range mod.ImportedFunctions() {
 		if module, _, _ := f.Import(); module == HostModule {
 			return true
@@ -170,7 +170,7 @@ func (e *Exporter) detectGoExports(mod wazero.CompiledModule) bool {
 }
 
 func (e *Exporter) BuildHost(ctx context.Context, module wazero.CompiledModule) error {
-	if !e.detectGoExports(module) {
+	if !e.DetectGoExports(module) {
 		return nil
 	}
 	_, err := e.runtime.NewHostModuleBuilder(HostModule).
@@ -214,7 +214,7 @@ func (e *Exporter) BuildHost(ctx context.Context, module wazero.CompiledModule) 
 }
 
 func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.CompiledModule, config wazero.ModuleConfig) (api.Module, error) {
-	if !e.detectGoExports(compiled) {
+	if !e.DetectGoExports(compiled) {
 		return e.runtime.InstantiateModule(ctx, compiled, config)
 	}
 
