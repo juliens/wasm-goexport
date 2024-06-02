@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 	"encoding/json"
-	"os"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -231,7 +230,7 @@ func (e Exporter) InstantiateModule(ctx context.Context, compiled wazero.Compile
 	ctx = context.WithValue(ctx, callback_key, callbackChan)
 	go func() {
 		var err error
-		mod, err = e.runtime.InstantiateModule(ctx, compiled, config.WithStartFunctions().WithStdout(os.Stdout))
+		mod, err = e.runtime.InstantiateModule(ctx, compiled, config.WithStartFunctions())
 		if err != nil {
 			errCh <- err
 			return
