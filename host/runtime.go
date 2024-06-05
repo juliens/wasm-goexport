@@ -62,33 +62,6 @@ func (e *Runtime) buildHost(ctx context.Context) error {
 	return err
 }
 
-type proxyCompiledModule struct {
-	wazero.CompiledModule
-	fnDef map[string]api.FunctionDefinition
-}
-
-func (p proxyCompiledModule) ExportedFunctionDefinitions() map[string]api.FunctionDefinition {
-	return p.fnDef
-}
-
-func (e Runtime) CompileModule(ctx context.Context, binary []byte) (wazero.CompiledModule, error) {
-	mod, err := e.Runtime.CompileModule(ctx, binary)
-	if err != nil {
-		return nil, err
-	}
-	if !DetectGoExports(mod) {
-		return mod, nil
-	}
-
-	iMod, err := e.InstantiateModule(ctx, mod, wazero.NewModuleConfig().WithStartFunctions())
-	if err != nil {
-		return nil, err
-	}
-	def := iMod.ExportedFunctionDefinitions()
-	iMod.Close(ctx)
-	return proxyCompiledModule{CompiledModule: mod, fnDef: def}, nil
-}
-
 func (e Runtime) InstantiateModule(ctx context.Context, compiled wazero.CompiledModule, config wazero.ModuleConfig) (api.Module, error) {
 	callbackChan := make(chan uint32)
 	feedbackChan := make(chan struct{})
