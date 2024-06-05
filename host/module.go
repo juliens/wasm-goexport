@@ -39,11 +39,6 @@ func (d definition) ExportNames() []string {
 	panic("implement me")
 }
 
-func (d definition) wazeroOnly() {
-	// TODO implement me
-	panic("implement me")
-}
-
 func (d definition) Name() string {
 	return ""
 }
@@ -106,11 +101,6 @@ func (l *localFunc) Call(ctx context.Context, params ...uint64) ([]uint64, error
 }
 
 func (l *localFunc) CallWithStack(ctx context.Context, stack []uint64) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (l *localFunc) wazeroOnly() {
 	// TODO implement me
 	panic("implement me")
 }

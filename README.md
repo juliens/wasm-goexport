@@ -18,10 +18,8 @@ import (
 func main() {
 	guest.SetExports([]*guest.Function{
 		{
-			ModuleName: "try",
-			Name:       "toto",
+			Name:       "double",
 			Fn: func(i uint64) uint64 {
-				fmt.Println("TOTO IS CALLED", i)
 				return i * 2
 			},
 			Params:  []api.ValueType{api.ValueTypeI64},
@@ -70,7 +68,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ret, err := e.ExportedFunction("toto").Call(context.Background(), 42)
+	ret, err := e.ExportedFunction("double").Call(context.Background(), 42)
 	fmt.Println(ret)
 	if err != nil {
 		fmt.Println(err)
