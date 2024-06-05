@@ -24,6 +24,7 @@ func main() {
 			Name:       "titi",
 			Fn: func(i uint64, j uint64) uint64 {
 				fmt.Println("TiTi IS CALLED", i)
+				tata()
 				return i + j
 			},
 			Params:  []api.ValueType{api.ValueTypeI64, api.ValueTypeI64},
@@ -32,3 +33,6 @@ func main() {
 	},
 	)
 }
+
+//go:wasmimport tata tata
+func tata()
