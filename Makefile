@@ -6,4 +6,4 @@ build: $(SOURCES)
 	    GOOS=wasip1 GOARCH=wasm go build -o $$(echo $$f | sed -e 's/\.go/\.wasm/') $$f; \
 	done
 test: build
-	go test ./host
+	go test ./guest

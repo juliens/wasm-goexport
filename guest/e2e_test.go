@@ -69,7 +69,7 @@ func TestE2EContext(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.WithValue(context.Background(), test_key{}, struct{}{})
-	_, err = e.ExportedFunction("callImport").Call(ctx, 42)
+	_, err = e.ExportedFunction("callImport").Call(ctx)
 	require.NoError(t, err)
 	require.True(t, call)
 
