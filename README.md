@@ -58,6 +58,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+
 	mod, err := runtime.CompileModule(context.Background(), wasm)
 	if err != nil {
 		log.Fatal(err)

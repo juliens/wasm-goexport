@@ -63,10 +63,21 @@ func (e *Runtime) buildHost(ctx context.Context) error {
 }
 
 func (e Runtime) InstantiateModule(ctx context.Context, compiled wazero.CompiledModule, config wazero.ModuleConfig) (api.Module, error) {
+	if !DetectGoExports(compiled) {
+		return e.Runtime.InstantiateModule(ctx, compiled, config)
+	}
+
+	mod, err := e.Runtime.InstantiateModule(ctx, compiled, config.WithStartFunctions())
+	if err != nil {
+		return nil, err
+	}
+
+	if mod.ExportedFunction("_start") == nil {
+		return mod, nil
+	}
+
 	callbackChan := make(chan uint32)
 	feedbackChan := make(chan struct{})
-
-	var mod api.Module
 	errCh := make(chan error)
 
 	// To create a pointer for context.Context
@@ -74,15 +85,9 @@ func (e Runtime) InstantiateModule(ctx context.Context, compiled wazero.Compiled
 	var ptrCtx = &cpCtx
 	ctx = context.WithValue(ctx, ctx_key, ptrCtx)
 	ctx = context.WithValue(ctx, callback_key, callbackChan)
-	go func() {
-		var err error
-		ctx := magicContext{ctx}
-		mod, err = e.Runtime.InstantiateModule(ctx, compiled, config.WithStartFunctions())
-		if err != nil {
-			errCh <- err
-			return
-		}
 
+	go func() {
+		ctx = magicContext{ctx}
 		_, err = mod.ExportedFunction("_start").Call(ctx)
 
 		if err != nil {
@@ -90,13 +95,14 @@ func (e Runtime) InstantiateModule(ctx context.Context, compiled wazero.Compiled
 		}
 	}()
 
-	modu := &Module{callbackChan: callbackChan, ptrCtx: ptrCtx}
 	select {
 	case err := <-errCh:
 		return nil, err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case exportedFn := <-e.exportsChan:
+		modu := &Module{callbackChan: callbackChan, ptrCtx: ptrCtx, Module: mod}
+
 		exported := map[string]*localFunc{}
 		for i, f := range exportedFn {
 			exported[f.Name] = &localFunc{
@@ -110,7 +116,6 @@ func (e Runtime) InstantiateModule(ctx context.Context, compiled wazero.Compiled
 
 		}
 		modu.exportedFn = exported
-		modu.Module = mod
 		return modu, nil
 	}
 }
