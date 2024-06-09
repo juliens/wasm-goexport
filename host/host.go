@@ -10,6 +10,9 @@ import (
 const HostModule = "go_exporter"
 
 func (e Runtime) buildHost(ctx context.Context) error {
+	if e.Runtime.Module(HostModule) != nil {
+		return nil
+	}
 	_, err := e.Runtime.NewHostModuleBuilder(HostModule).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
