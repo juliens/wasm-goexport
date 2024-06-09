@@ -9,9 +9,10 @@ type magicContext struct {
 }
 
 func (m magicContext) Value(key any) any {
-	val := m.Context.Value(key)
+	val := GetRealCtx(m.Context).Value(key)
 	if val != nil {
 		return val
 	}
-	return GetRealCtx(m.Context).Value(key)
+
+	return m.Context.Value(key)
 }
