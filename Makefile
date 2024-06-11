@@ -1,5 +1,7 @@
 SOURCES := $(wildcard guest/examples/*/*.go)
 
+default: checks test build
+
 .PHONY=build
 build: $(SOURCES)
 	@for f in $^; do \
@@ -7,3 +9,6 @@ build: $(SOURCES)
 	done
 test: build
 	go test ./guest
+
+checks:
+	golangci-lint run
