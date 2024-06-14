@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -30,12 +31,12 @@ func (e Runtime) InstantiateModule(ctx context.Context, compiled wazero.Compiled
 
 	err := e.buildHost(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build host: %w", err)
 	}
 
 	mod, err := e.Runtime.InstantiateModule(ctx, compiled, config.WithStartFunctions())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("instantiate module: %w", err)
 	}
 
 	if mod.ExportedFunction("_start") == nil {
